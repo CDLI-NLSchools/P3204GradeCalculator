@@ -397,14 +397,14 @@
         { id: "u2_ps06", name: "PS06", unitWeight: 0.2, type: "Performance" },
         { id: "u2_ps07", name: "PS07", unitWeight: 0.2, type: "Performance" },
         { id: "u2_ps08", name: "PS08", unitWeight: 0.2, type: "Performance" },
-        { id: "u2_oa3",  name: "OA3",  unitWeight: 0.3, type: "Performance" },
-        { id: "u2_oa4",  name: "OA4",  unitWeight: 0.3, type: "Performance" },
-        { id: "u2_oa5",  name: "OA5",  unitWeight: 0.3, type: "Performance" },
+        // OA 3 and OA 4 combined, equally weighted with OA 5 (0.45 each)
+        { id: "u2_oa34", name: "OA3/4", unitWeight: 0.45, type: "Performance" },
+        { id: "u2_oa5",  name: "OA5",   unitWeight: 0.45, type: "Performance" },
         { id: "u2_la3",  name: "LA3 - Inclines",    unitWeight: 0.45, type: "Performance" },
         { id: "u2_la4",  name: "LA4 - Equilibrium", unitWeight: 0.45, type: "Performance" },
-        // Tests 3 and 4 combined into one 25% assessment (1.5 / 6.0 = 25% of unit)
+        // Tests 3 and 4 combined (1.5 / 6.0 = 25% of unit)
         { id: "u2_t34",  name: "T3/4 - Forces Test A & B", unitWeight: 1.5, type: "Testing" },
-        // Test 5 counts for the remaining 25% assessment (1.5 / 6.0 = 25% of unit)
+        // Test 5 (1.5 / 6.0 = 25% of unit)
         { id: "u2_t5",   name: "T5 - Forces Test C", unitWeight: 1.5, type: "Testing" }
       ]
     },
@@ -465,7 +465,6 @@
 
       let tableRows = '';
       unit.items.forEach(item => {
-        // Course weight formula: (item weight / unit total weight) * course unit weight
         const absoluteCourseWeight = (item.unitWeight / unit.unitTotalWeight) * unit.courseWeight;
         const savedVal = studentScores[item.id] !== undefined ? studentScores[item.id] : '';
         const badgeClass = item.type === 'Testing' ? 'badge-worth badge-test' : 'badge-worth';
@@ -575,7 +574,6 @@
 
   document.getElementById('targetGoal').addEventListener('input', calculateGrades);
 
-  // Standard reset
   function resetAllGrades() {
     if (confirm("Clear all entered scores? This cannot be undone.")) {
       studentScores = {};
@@ -584,7 +582,6 @@
     }
   }
 
-  // Complete cleanup for shared computer sessions
   async function clearSharedComputerData() {
     const confirmed = confirm(
       "Are you on a shared computer?\n\nThis will permanently delete all saved scores and clear browser cache storage for this tool."
@@ -598,13 +595,12 @@
       localStorage.clear();
       sessionStorage.clear();
 
-      // Clear any service worker / cache storage if registered
       if ('caches' in window) {
         const cacheNames = await caches.keys();
         await Promise.all(cacheNames.map(name => caches.delete(name)));
       }
     } catch (e) {
-      console.warn("Storage cleanup completed with notes:", e);
+      console.warn("Storage cleanup notes:", e);
     }
 
     initUI();

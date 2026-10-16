@@ -42,7 +42,7 @@
     /* Header */
     .header {
       text-align: center;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
 
     .header h1 {
@@ -55,6 +55,26 @@
     .header p {
       color: var(--text-muted);
       font-size: 15px;
+    }
+
+    /* Shared Computer Tip Banner */
+    .device-notice {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 13.5px;
+      color: #1e40af;
+      line-height: 1.45;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .device-notice .icon {
+      font-size: 18px;
+      flex-shrink: 0;
     }
 
     /* Dashboard Metrics */
@@ -242,10 +262,14 @@
       box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
     }
 
-    /* Footer reset */
+    /* Footer reset buttons */
     .footer-actions {
       text-align: center;
       margin: 30px 0 40px;
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
     }
 
     .btn-reset {
@@ -257,12 +281,30 @@
       padding: 8px 16px;
       border-radius: 8px;
       cursor: pointer;
+      transition: all 0.2s;
     }
 
     .btn-reset:hover {
       background: #f1f5f9;
       color: #ef4444;
       border-color: #ef4444;
+    }
+
+    .btn-clear-cache {
+      background: #fee2e2;
+      border: 1px solid #fca5a5;
+      color: #b91c1c;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-clear-cache:hover {
+      background: #fecaca;
+      border-color: #f87171;
     }
   </style>
 </head>
@@ -273,6 +315,14 @@
   <div class="header">
     <h1>Physics 3204 Grade Forecaster</h1>
     <p>Enter your grades below to see how each assignment impacts your final course mark.</p>
+  </div>
+
+  <!-- Shared Computer Recommendation Notice -->
+  <div class="device-notice">
+    <div class="icon">💡</div>
+    <div>
+      <strong>Notice for shared computer users:</strong> If you are using a school or lab computer, please remember to click <em>"Clear Browser Data & Cache"</em> before leaving. For continuous progress tracking, we recommend using your phone or personal device so your entered grades remain saved!
+    </div>
   </div>
 
   <!-- Dashboard Overview -->
@@ -310,7 +360,8 @@
   <div id="unitsContainer"></div>
 
   <div class="footer-actions">
-    <button class="btn-reset" onclick="resetAllGrades()">Reset / Clear Saved Scores</button>
+    <button class="btn-clear-cache" onclick="clearSharedComputerData()">Clear Browser Data & Cache (Shared Computer)</button>
+    <button class="btn-reset" onclick="resetAllGrades()">Reset Scores Only</button>
   </div>
 
 </div>
@@ -338,7 +389,7 @@
     {
       unitName: "Unit 2: Forces",
       courseWeight: 19.1,
-      unitTotalWeight: 6.0, // 3 Performance + 3 Testing
+      unitTotalWeight: 6.0, // 3 Performance (50%) + 3 Testing (50%)
       items: [
         { id: "u2_ps03", name: "PS03", unitWeight: 0.2, type: "Performance" },
         { id: "u2_ps04", name: "PS04", unitWeight: 0.2, type: "Performance" },
@@ -351,9 +402,10 @@
         { id: "u2_oa5",  name: "OA5",  unitWeight: 0.3, type: "Performance" },
         { id: "u2_la3",  name: "LA3 - Inclines",    unitWeight: 0.45, type: "Performance" },
         { id: "u2_la4",  name: "LA4 - Equilibrium", unitWeight: 0.45, type: "Performance" },
-        { id: "u2_t3",   name: "T3 - Forces Test A", unitWeight: 1.0, type: "Testing" },
-        { id: "u2_t4",   name: "T4 - Forces Test B", unitWeight: 1.0, type: "Testing" },
-        { id: "u2_t5",   name: "T5 - Forces Test C", unitWeight: 1.0, type: "Testing" }
+        // Tests 3 and 4 combined into one 25% assessment (1.5 / 6.0 = 25% of unit)
+        { id: "u2_t34",  name: "T3/4 - Forces Test A & B", unitWeight: 1.5, type: "Testing" },
+        // Test 5 counts for the remaining 25% assessment (1.5 / 6.0 = 25% of unit)
+        { id: "u2_t5",   name: "T5 - Forces Test C", unitWeight: 1.5, type: "Testing" }
       ]
     },
     {
@@ -523,12 +575,40 @@
 
   document.getElementById('targetGoal').addEventListener('input', calculateGrades);
 
+  // Standard reset
   function resetAllGrades() {
     if (confirm("Clear all entered scores? This cannot be undone.")) {
       studentScores = {};
       localStorage.removeItem(STORAGE_KEY);
       initUI();
     }
+  }
+
+  // Complete cleanup for shared computer sessions
+  async function clearSharedComputerData() {
+    const confirmed = confirm(
+      "Are you on a shared computer?\n\nThis will permanently delete all saved scores and clear browser cache storage for this tool."
+    );
+    if (!confirmed) return;
+
+    studentScores = {};
+
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // Clear any service worker / cache storage if registered
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      }
+    } catch (e) {
+      console.warn("Storage cleanup completed with notes:", e);
+    }
+
+    initUI();
+    alert("Browser data and cached scores have been cleared successfully.");
   }
 
   // Load UI on start

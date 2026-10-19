@@ -171,7 +171,7 @@
       border-radius: 16px;
       border: 1px solid var(--border);
       margin-bottom: 20px;
-      overflow: hidden;
+      overflow-x: auto;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
     }
 
@@ -202,6 +202,7 @@
     .assessment-table {
       width: 100%;
       border-collapse: collapse;
+      min-width: 520px;
     }
 
     .assessment-table th {
@@ -211,12 +212,12 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
       color: var(--text-muted);
-      padding: 10px 20px;
+      padding: 10px 18px;
       border-bottom: 1px solid var(--border);
     }
 
     .assessment-table td {
-      padding: 10px 20px;
+      padding: 10px 18px;
       border-bottom: 1px solid #f1f5f9;
       font-size: 14px;
       vertical-align: middle;
@@ -228,6 +229,12 @@
 
     .col-name {
       font-weight: 600;
+      transition: color 0.15s;
+    }
+
+    .text-exempt {
+      text-decoration: line-through;
+      color: var(--text-muted);
     }
 
     .badge-worth {
@@ -238,11 +245,37 @@
       background: var(--blue-light);
       color: var(--blue);
       display: inline-block;
+      transition: all 0.2s;
     }
 
     .badge-test {
       background: var(--amber-light);
       color: var(--amber);
+    }
+
+    .badge-exempt {
+      background: #f1f5f9;
+      color: #94a3b8;
+      border: 1px dashed #cbd5e1;
+    }
+
+    /* Exempt Checkbox styling */
+    .exempt-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .exempt-checkbox {
+      width: 15px;
+      height: 15px;
+      cursor: pointer;
+      accent-color: var(--blue);
     }
 
     .score-input {
@@ -260,6 +293,13 @@
     .score-input:focus {
       border-color: var(--blue);
       box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+    }
+
+    .score-input:disabled {
+      background: #f1f5f9;
+      color: #94a3b8;
+      border-color: #e2e8f0;
+      cursor: not-allowed;
     }
 
     /* Footer reset buttons */
@@ -362,6 +402,7 @@
   <div class="footer-actions">
     <button class="btn-clear-cache" onclick="clearSharedComputerData()">Clear Browser Data & Cache (Shared Computer)</button>
     <button class="btn-reset" onclick="resetAllGrades()">Reset Scores Only</button>
+    <button class="btn-reset" onclick="resetExemptions()">Reset Exemptions</button>
   </div>
 
 </div>
@@ -397,14 +438,11 @@
         { id: "u2_ps06", name: "PS06", unitWeight: 0.2, type: "Performance" },
         { id: "u2_ps07", name: "PS07", unitWeight: 0.2, type: "Performance" },
         { id: "u2_ps08", name: "PS08", unitWeight: 0.2, type: "Performance" },
-        // OA 3 and OA 4 combined, equally weighted with OA 5 (0.45 each)
         { id: "u2_oa34", name: "OA3/4", unitWeight: 0.45, type: "Performance" },
         { id: "u2_oa5",  name: "OA5",   unitWeight: 0.45, type: "Performance" },
         { id: "u2_la3",  name: "LA3 - Inclines",    unitWeight: 0.45, type: "Performance" },
         { id: "u2_la4",  name: "LA4 - Equilibrium", unitWeight: 0.45, type: "Performance" },
-        // Tests 3 and 4 combined (1.5 / 6.0 = 25% of unit)
         { id: "u2_t34",  name: "T3/4 - Forces Test A & B", unitWeight: 1.5, type: "Testing" },
-        // Test 5 (1.5 / 6.0 = 25% of unit)
         { id: "u2_t5",   name: "T5 - Forces Test C", unitWeight: 1.5, type: "Testing" }
       ]
     },
@@ -452,8 +490,11 @@
     }
   ];
 
-  const STORAGE_KEY = "physics_3204_grades_v1";
-  let studentScores = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+  const STORAGE_KEY_SCORES = "physics_3204_grades_v1";
+  const STORAGE_KEY_EXEMPT = "physics_3204_exempt_v1";
+
+  let studentScores = JSON.parse(localStorage.getItem(STORAGE_KEY_SCORES)) || {};
+  let exemptions = JSON.parse(localStorage.getItem(STORAGE_KEY_EXEMPT)) || {};
 
   function initUI() {
     const container = document.getElementById('unitsContainer');
@@ -465,22 +506,36 @@
 
       let tableRows = '';
       unit.items.forEach(item => {
-        const absoluteCourseWeight = (item.unitWeight / unit.unitTotalWeight) * unit.courseWeight;
+        const isExempt = !!exemptions[item.id];
         const savedVal = studentScores[item.id] !== undefined ? studentScores[item.id] : '';
-        const badgeClass = item.type === 'Testing' ? 'badge-worth badge-test' : 'badge-worth';
 
         tableRows += `
           <tr>
-            <td class="col-name">${item.name}</td>
-            <td><span class="${badgeClass}">${absoluteCourseWeight.toFixed(2)}% of Final</span></td>
+            <td class="col-name ${isExempt ? 'text-exempt' : ''}" id="name_${item.id}">
+              ${item.name}
+            </td>
+            <td>
+              <span id="badge_${item.id}" class="badge-worth">--%</span>
+            </td>
+            <td style="text-align: center; width: 90px;">
+              <label class="exempt-label" title="Exempt this item from grade calculation">
+                <input type="checkbox" 
+                       class="exempt-checkbox"
+                       id="exempt_${item.id}" 
+                       ${isExempt ? 'checked' : ''} 
+                       onchange="onExemptChange('${item.id}', this.checked)">
+                <span>Exempt</span>
+              </label>
+            </td>
             <td style="text-align: right;">
               <input type="number" 
                      class="score-input" 
-                     id="${item.id}" 
-                     placeholder="--" 
+                     id="score_${item.id}" 
+                     placeholder="${isExempt ? 'EX' : '--'}" 
                      min="0" 
                      max="100" 
-                     value="${savedVal}"
+                     value="${isExempt ? '' : savedVal}"
+                     ${isExempt ? 'disabled' : ''}
                      oninput="onScoreChange('${item.id}', this.value)">
               <span style="font-size:12px; font-weight:600; color:var(--text-muted); margin-left:4px;">%</span>
             </td>
@@ -498,6 +553,7 @@
             <tr>
               <th>Assessment</th>
               <th>Actual Course Worth</th>
+              <th style="text-align: center;">Exempt</th>
               <th style="text-align: right;">Your Score</th>
             </tr>
           </thead>
@@ -519,7 +575,33 @@
     } else {
       studentScores[id] = Math.min(100, Math.max(0, parseFloat(value)));
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(studentScores));
+    localStorage.setItem(STORAGE_KEY_SCORES, JSON.stringify(studentScores));
+    calculateGrades();
+  }
+
+  function onExemptChange(id, isChecked) {
+    if (isChecked) {
+      exemptions[id] = true;
+    } else {
+      delete exemptions[id];
+    }
+    localStorage.setItem(STORAGE_KEY_EXEMPT, JSON.stringify(exemptions));
+
+    const scoreInput = document.getElementById('score_' + id);
+    const nameEl = document.getElementById('name_' + id);
+
+    if (isChecked) {
+      scoreInput.disabled = true;
+      scoreInput.value = '';
+      scoreInput.placeholder = 'EX';
+      if (nameEl) nameEl.classList.add('text-exempt');
+    } else {
+      scoreInput.disabled = false;
+      scoreInput.placeholder = '--';
+      scoreInput.value = studentScores[id] !== undefined ? studentScores[id] : '';
+      if (nameEl) nameEl.classList.remove('text-exempt');
+    }
+
     calculateGrades();
   }
 
@@ -529,21 +611,46 @@
     let lostCoursePoints = 0;
 
     courseData.forEach(unit => {
+      // 1. Calculate active total weight for the unit (omitting exempted tasks)
+      const activeUnitWeight = unit.items.reduce((sum, item) => {
+        return sum + (exemptions[item.id] ? 0 : item.unitWeight);
+      }, 0);
+
       unit.items.forEach(item => {
-        const absoluteWeight = (item.unitWeight / unit.unitTotalWeight) * unit.courseWeight;
-        if (studentScores[item.id] !== undefined) {
-          const score = studentScores[item.id];
-          const earned = (score / 100) * absoluteWeight;
-          bankedPoints += earned;
-          gradedCourseWeight += absoluteWeight;
-          lostCoursePoints += (absoluteWeight - earned);
+        const isExempt = !!exemptions[item.id];
+        const badgeEl = document.getElementById('badge_' + item.id);
+
+        if (isExempt) {
+          if (badgeEl) {
+            badgeEl.className = 'badge-worth badge-exempt';
+            badgeEl.textContent = 'Exempted';
+          }
+        } else {
+          // Weight scaled up proportionally so the unit retains its exact course weight
+          const absoluteWeight = activeUnitWeight > 0 
+            ? (item.unitWeight / activeUnitWeight) * unit.courseWeight 
+            : 0;
+
+          if (badgeEl) {
+            const badgeClass = item.type === 'Testing' ? 'badge-worth badge-test' : 'badge-worth';
+            badgeEl.className = badgeClass;
+            badgeEl.textContent = `${absoluteWeight.toFixed(2)}% of Final`;
+          }
+
+          if (studentScores[item.id] !== undefined) {
+            const score = studentScores[item.id];
+            const earned = (score / 100) * absoluteWeight;
+            bankedPoints += earned;
+            gradedCourseWeight += absoluteWeight;
+            lostCoursePoints += (absoluteWeight - earned);
+          }
         }
       });
     });
 
     const currentRunning = gradedCourseWeight > 0 ? (bankedPoints / gradedCourseWeight) * 100 : null;
     const maxPossible = 100 - lostCoursePoints;
-    const remainingCourseWeight = 100 - gradedCourseWeight;
+    const remainingCourseWeight = Math.max(0, 100 - gradedCourseWeight);
 
     // Update Dashboard Cards
     document.getElementById('currentRunning').textContent = currentRunning !== null ? currentRunning.toFixed(1) + '%' : '--%';
@@ -556,7 +663,7 @@
     const targetResultEl = document.getElementById('targetResult');
 
     if (remainingCourseWeight === 0) {
-      targetResultEl.textContent = "All coursework completed!";
+      targetResultEl.textContent = "All active coursework completed!";
     } else {
       const neededPoints = targetGoal - bankedPoints;
       if (neededPoints <= 0) {
@@ -575,23 +682,33 @@
   document.getElementById('targetGoal').addEventListener('input', calculateGrades);
 
   function resetAllGrades() {
-    if (confirm("Clear all entered scores? This cannot be undone.")) {
+    if (confirm("Clear all entered scores? (Exemptions will remain saved)")) {
       studentScores = {};
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY_SCORES);
+      initUI();
+    }
+  }
+
+  function resetExemptions() {
+    if (confirm("Remove all exemptions? (Entered scores will remain saved)")) {
+      exemptions = {};
+      localStorage.removeItem(STORAGE_KEY_EXEMPT);
       initUI();
     }
   }
 
   async function clearSharedComputerData() {
     const confirmed = confirm(
-      "Are you on a shared computer?\n\nThis will permanently delete all saved scores and clear browser cache storage for this tool."
+      "Are you on a shared computer?\n\nThis will permanently delete all saved scores, exemptions, and clear browser cache storage for this tool."
     );
     if (!confirmed) return;
 
     studentScores = {};
+    exemptions = {};
 
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY_SCORES);
+      localStorage.removeItem(STORAGE_KEY_EXEMPT);
       localStorage.clear();
       sessionStorage.clear();
 
@@ -604,10 +721,10 @@
     }
 
     initUI();
-    alert("Browser data and cached scores have been cleared successfully.");
+    alert("Browser data, scores, and exemptions have been cleared successfully.");
   }
 
-  // Load UI on start
+  // Initial load
   initUI();
 </script>
 
